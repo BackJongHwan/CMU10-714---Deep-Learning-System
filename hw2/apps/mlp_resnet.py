@@ -13,7 +13,17 @@ np.random.seed(0)
 
 def ResidualBlock(dim, hidden_dim, norm=nn.BatchNorm1d, drop_prob=0.1):
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    f = nn.Sequential(
+        nn.Linear(dim, hidden_dim), 
+        norm(dim=hidden_dim), 
+        nn.ReLU(), 
+        nn.Dropout(drop_prob),
+        nn.Linear(hidden_dim, dim),
+        norm(dim=dim),
+    )
+    fn = nn.Residual(f)
+    # how can I input +//...
+    return nn.Sequential(fn, nn.ReLU())
     ### END YOUR SOLUTION
 
 
