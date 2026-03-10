@@ -36,14 +36,45 @@ def MLPResNet(
     drop_prob=0.1,
 ):
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    modules = [nn.Linear(dim, hidden_dim), nn.ReLU()]
+    for _ in range(num_blocks):
+        modules.append(ResidualBlock(hidden_dim, hidden_dim // 2, norm, drop_prob))
+    modules.append(nn.Linear(hidden_dim, num_classes))
+    return nn.Sequential(*modules)
     ### END YOUR SOLUTION
 
 
 def epoch(dataloader, model, opt=None):
     np.random.seed(4)
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    if opt:
+        model.train()
+    else:
+        model.eval()
+
+    loss_fn = nn.SoftmaxLoss()
+    total_loss = 0.0
+    total_error = 0.0
+    num_samples = 0
+
+    for X, y in dataloader:
+        logits = model(X)
+        loss = loss_fn(logits, y)
+
+        if opt:
+            opt.reset_grad()
+            loss.backward()
+            opt.step()
+
+        preds = np.argmax(logits.numpy(), axis=1)
+        labels = y.numpy()
+        
+        batch_size = X.shape[0]
+        total_error += np.sum(preds != labels)
+        total_loss += loss.numpy() * batch_size
+        num_samples += batch_size
+
+    return np.float32(total_error / num_samples), np.float32(total_loss / num_samples)
     ### END YOUR SOLUTION
 
 
@@ -58,7 +89,25 @@ def train_mnist(
 ):
     np.random.seed(4)
     ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
+    train_dataset = ndl.data.MNISTDataset(
+        f"{data_dir}/train-images-idx3-ubyte.gz",
+        f"{data_dir}/train-labels-idx1-ubyte.gz",
+    )
+    test_dataset = ndl.data.MNISTDataset(
+        f"{data_dir}/t10k-images-idx3-ubyte.gz",
+        f"{data_dir}/t10k-labels-idx1-ubyte.gz",
+    )
+    train_dataloader = ndl.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = ndl.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
+    model = MLPResNet(784, hidden_dim)
+    opt = optimizer(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    for _ in range(epochs):
+        train_err, train_loss = epoch(train_dataloader, model, opt)
+        test_err, test_loss = epoch(test_dataloader, model, None)
+
+    return np.float32(train_err), np.float32(train_loss), np.float32(test_err), np.float32(test_loss)
     ### END YOUR SOLUTION
 
 

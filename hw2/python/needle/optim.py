@@ -32,7 +32,7 @@ class SGD(Optimizer):
             else:
                 self.u[para] = self.momentum * self.u[para].data + (1-self.momentum) * curr_grad.data
             # para = para.data - self.lr * self.u[para].data
-            para.data = para.data - self.lr * self.u[para].data
+            para.data = ndl.Tensor(para.data - self.lr * self.u[para].data, dtype=para.dtype)
 
         ### END YOUR SOLUTION
 
@@ -81,6 +81,6 @@ class Adam(Optimizer):
             # bias correction
             m_bias = self.m[para].data / (1 - self.beta1 ** self.t)
             v_bias = self.v[para].data / (1 - self.beta2 ** self.t)
-            para.data = para.data - self.lr * m_bias.data / ((v_bias.data ** 0.5) + self.eps)
+            para.data = ndl.Tensor(para.data - self.lr * m_bias.data / ((v_bias.data ** 0.5) + self.eps), dtype=para.dtype)
 
         ### END YOUR SOLUTION
