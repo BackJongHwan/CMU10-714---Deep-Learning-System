@@ -77,6 +77,9 @@ if(CUDA_FOUND)
   CUDA_ADD_LIBRARY(ndarray_backend_cuda MODULE src/ndarray_backend_cuda.cu OPTIONS ${ARCH_FLAGS})
 
   target_link_libraries(ndarray_backend_cuda ${LINKER_LIBS})
+  if(MSVC)
+    target_link_options(ndarray_backend_cuda PRIVATE /IGNORE:4098 /IGNORE:4099)
+  endif()
   pybind11_extension(ndarray_backend_cuda)
   pybind11_strip(ndarray_backend_cuda)
 
