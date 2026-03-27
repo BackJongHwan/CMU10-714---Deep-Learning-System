@@ -458,6 +458,8 @@ void EwiseTanh(const CudaArray& a, CudaArray* out) {
 // Elementwise and scalar operations
 ////////////////////////////////////////////////////////////////////////////////
 
+__global__ void MatMulKernel(){
+}
 
 void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, uint32_t N,
             uint32_t P) {
@@ -492,12 +494,12 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, 
 // Max and sum reductions
 ////////////////////////////////////////////////////////////////////////////////
 
-__global__void ReduceMaxKernel(const scalar_t *a, scalar_t *out, size_t size, size_t reduce_size){
+__global__ void ReduceMaxKernel(const scalar_t *a, scalar_t *out, size_t size, size_t reduce_size){
   size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
   if(gid < size){
     size_t start_idx = gid * reduce_size;
     float max_val = a[start_idx];
-    for(size_t i = 1; i < redice_size; i++){
+    for(size_t i = 1; i < reduce_size; i++){
       max_val = fmaxf(max_val, a[start_idx+ i]);
     }
     out[gid] = max_val;
@@ -515,18 +517,18 @@ void ReduceMax(const CudaArray& a, CudaArray* out, size_t reduce_size) {
    *   redice_size: size of the dimension to reduce over
    */
   /// BEGIN SOLUTION
-  CudaDim dim = CudaOneDim(out->size);
-  ReduceMaxKernel<<dim.grid, dim.block>>>(a.ptr, out->ptr, out->size, reduce_size);
+  CudaDims dim = CudaOneDim(out->size);
+  ReduceMaxKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, out->size, reduce_size);
 
   /// END SOLUTION
 }
 
-__global__void ReduceSumKernel(const scalar_t *a, scalar_t *out, size_t size, size_t reduce_size){
+__global__ void ReduceSumKernel(const scalar_t *a, scalar_t *out, size_t size, size_t reduce_size){
   size_t gid = blockIdx.x * blockDim.x + threadIdx.x;
   if(gid < size){
     size_t start_idx = gid * reduce_size;
     float sum = 0;
-    for(size_t i = 0; i < redice_size; i++){
+    for(size_t i = 0; i < reduce_size; i++){
       sum += a[start_idx+ i];
     }
     out[gid] = sum;
@@ -545,8 +547,8 @@ void ReduceSum(const CudaArray& a, CudaArray* out, size_t reduce_size) {
    *   redice_size: size of the dimension to reduce over
    */
   /// BEGIN SOLUTION
-  CudaDim dim = CudaOneDim(out->size);
-  ReduceSumKernel<<dim.grid, dim.block>>>(a.ptr, out->ptr, out->size, reduce_size);
+  CudaDims dim = CudaOneDim(out->size);
+  ReduceSumKernel<<<dim.grid, dim.block>>>(a.ptr, out->ptr, out->size, reduce_size);
   /// END SOLUTION
 }
 
@@ -615,7 +617,7 @@ PYBIND11_MODULE(ndarray_backend_cuda, m) {
   m.def("ewise_exp", EwiseExp);
   m.def("ewise_tanh", EwiseTanh);
 
-  // m.def("matmul", Matmul);
+  m.def("matmul", Matmul);
 
   m.def("reduce_max", ReduceMax);
   m.def("reduce_sum", ReduceSum);

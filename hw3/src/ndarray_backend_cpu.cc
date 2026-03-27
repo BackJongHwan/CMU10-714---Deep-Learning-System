@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <algorithm>
+#include <numeric>
 
 namespace needle {
 namespace cpu {
@@ -22,11 +24,22 @@ const size_t ELEM_SIZE = sizeof(scalar_t);
  */
 struct AlignedArray {
   AlignedArray(const size_t size) {
+#ifdef _WIN32
+    ptr = (scalar_t*)_aligned_malloc(size * ELEM_SIZE, ALIGNMENT);
+    if (!ptr) throw std::bad_alloc();
+#else
     int ret = posix_memalign((void**)&ptr, ALIGNMENT, size * ELEM_SIZE);
     if (ret != 0) throw std::bad_alloc();
+#endif
     this->size = size;
   }
-  ~AlignedArray() { free(ptr); }
+  ~AlignedArray() {
+#ifdef _WIN32
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+  }
   size_t ptr_as_int() {return (size_t)ptr; }
   scalar_t* ptr;
   size_t size;
@@ -383,6 +396,13 @@ void Matmul(const AlignedArray& a, const AlignedArray& b, AlignedArray* out, uin
   }
   /// END SOLUTION
 }
+
+#if defined(_MSC_VER)
+#define __restrict__ __restrict
+#ifndef __builtin_assume_aligned
+#define __builtin_assume_aligned(ptr, align) (ptr)
+#endif
+#endif
 
 inline void AlignedDot(const float* __restrict__ a,
                        const float* __restrict__ b,

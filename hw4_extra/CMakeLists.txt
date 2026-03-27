@@ -3,13 +3,11 @@ project(needle C CXX)
 cmake_policy(SET CMP0146 OLD)
 
 # find correct version of Python
-execute_process(COMMAND python3-config --prefix
-  OUTPUT_VARIABLE Python_ROOT_DIR)
 find_package(Python COMPONENTS Development Interpreter REQUIRED)
 include_directories(${Python_INCLUDE_DIRS})
 
 # find pybind
-execute_process(COMMAND python3 -m pybind11 --cmakedir
+execute_process(COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
   RESULT_VARIABLE __pybind_exit_code
   OUTPUT_VARIABLE __pybind_path
   OUTPUT_STRIP_TRAILING_WHITESPACE)
@@ -20,12 +18,13 @@ if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "-std=c++11 -O2 -march=native ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CUDA_STANDARD 14)
 else()
-  set(CMAKE_CXX_FLAGS "/std:c++11 -O2 -march=native ${CMAKE_CXX_FLAGS}")
+  set(CMAKE_CXX_FLAGS "/O2 /wd4819 /utf-8 ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CUDA_STANDARD 14)
+  add_compile_definitions(_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS)
 endif()
 
 include_directories(SYSTEM ${pybind11_INCLUDE_DIRS})
-list(APPEND LINKER_LIBS ${pybind11_LIBRARIES})
+list(APPEND LINKER_LIBS ${pybind11_LIBRARIES} ${Python_LIBRARIES})
 
 
 ###################
@@ -41,6 +40,8 @@ pybind11_strip(ndarray_backend_cpu)
 set_target_properties(ndarray_backend_cpu
   PROPERTIES
   LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
+  LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
+  LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
   CXX_VISIBILITY_PRESET "hidden"
 )
 
@@ -80,6 +81,8 @@ if(CUDA_FOUND)
   set_target_properties(ndarray_backend_cuda
     PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
+    LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
+    LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/python/needle/backend_ndarray
     CXX_VISIBILITY_PRESET "hidden"
     CUDA_VISIBILITY_PRESET "hidden"
 )
