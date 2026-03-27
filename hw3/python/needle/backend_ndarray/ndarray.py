@@ -420,7 +420,7 @@ class NDArray:
 
         ### BEGIN YOUR SOLUTION
         # 1. raise
-        # already raise...
+        # already implemented ...
 
         # 2. return NDArray
 
