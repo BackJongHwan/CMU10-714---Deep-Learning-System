@@ -12,6 +12,11 @@ namespace cuda {
 #define BASE_THREAD_NUM 256
 
 #define TILE 4
+
+#define L 64
+#define S 8
+#define V 4
+
 typedef float scalar_t;
 const size_t ELEM_SIZE = sizeof(scalar_t);
 
@@ -458,7 +463,79 @@ void EwiseTanh(const CudaArray& a, CudaArray* out) {
 // Elementwise and scalar operations
 ////////////////////////////////////////////////////////////////////////////////
 
-__global__ void MatMulKernel(){
+/*Cuda two dimension for matrix Multiply*/
+CudaDims CudaTwoDim(size_t row, size_t col){
+  CudaDims dim;
+  dim.block = dim3(L / V, L / V);
+  dim.grid = dim3((col + L -1) / L, (row + L - 1) / L);
+  return dim;
+}
+
+
+__global__ void MatMulKernel(const scalar_t *a, const scalar_t *b, scalar_t *out, uint32_t M, uint32_t N, uint32_t P){
+  __shared__ float sA[S][L], sB[S][L];
+  float c[V][V] = {0};
+  float ra[V], rb[V];  // renamed from a/b to avoid shadowing kernel params registerA, B...
+
+  int ty = threadIdx.y;  // 0 .. L/V-1
+  int tx = threadIdx.x;  // 0 .. L/V-1
+  int nthreads = blockDim.x * blockDim.y;           // (L/V)^2 = 256
+  int tid = threadIdx.y * blockDim.x + threadIdx.x; // 0..255
+
+  // Top-left corner of this block's (L x L) output tile
+  int row_start = blockIdx.y * L;
+  int col_start = blockIdx.x * L;
+
+  for(int ko = 0; ko < N; ko += S){
+    __syncthreads();
+
+    // ---- Cooperative fetching ----
+    // sA[k_local][row_local] = A[row_start+row_local][ko+k_local]  (loaded transposed)
+    // sB[k_local][col_local] = B[ko+k_local][col_start+col_local]  (loaded normally)
+    // S*L = 8*64 = 512 elements, 256 threads -> each thread loads 2 elements
+    for(int idx = tid; idx < S * L; idx += nthreads){
+      int k_local   = idx / L;
+      int row_local = idx % L;
+      int g_row = row_start + row_local;
+      int g_k   = ko + k_local;
+      sA[k_local][row_local] = (g_row < M && g_k < N) ? a[g_row * N + g_k] : 0.0f;
+    }
+    for(int idx = tid; idx < S * L; idx += nthreads){
+      int k_local   = idx / L;
+      int col_local = idx % L;
+      int g_k   = ko + k_local;
+      int g_col = col_start + col_local;
+      sB[k_local][col_local] = (g_k < N && g_col < P) ? b[g_k * P + g_col] : 0.0f;
+    }
+
+    __syncthreads();
+
+    // ---- Inner loop: iterate through K-strip ----
+    for(int ki = 0; ki < S; ++ki){
+      // Assign register from shared memory
+      for(int y = 0; y < V; ++y) ra[y] = sA[ki][ty * V + y];
+      for(int x = 0; x < V; ++x) rb[x] = sB[ki][tx * V + x];
+
+      // Outer product: accumulate V x V block of C
+      for (int y = 0; y < V; ++y){
+        for(int x = 0; x < V; ++x){
+          c[y][x] += ra[y] * rb[x];
+        }
+      }
+    }
+  }
+
+  // ---- Write register tile c back to global out ----
+  // No cooperative fetch needed: each thread independently owns its V x V block
+  int ybase = row_start + ty * V;
+  int xbase = col_start + tx * V;
+  for(int y = 0; y < V; ++y){
+    for(int x = 0; x < V; ++x){
+      if(ybase + y < M && xbase + x < P){
+        out[(ybase + y) * P + (xbase + x)] = c[y][x];
+      }
+    }
+  }
 }
 
 void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, uint32_t N,
@@ -486,7 +563,9 @@ void Matmul(const CudaArray& a, const CudaArray& b, CudaArray* out, uint32_t M, 
    */
 
   /// BEGIN SOLUTION
-  // assert(false && "Not Implemented");
+  Fill(out, 0);
+  CudaDims dim = CudaTwoDim(M, P);
+  MatMulKernel<<<dim.grid, dim.block>>>(a.ptr, b.ptr, out->ptr, M, N, P);
   /// END SOLUTION
 }
 
